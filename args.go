@@ -93,7 +93,6 @@ func Compile(template string) (*GoArgs, error) {
 					goargs.operans = append(goargs.operans, operanName)
 				}
 			}
-
 		}
 
 		// 选项
@@ -149,8 +148,10 @@ func (goargs *GoArgs) Usage() string {
 		if len(cmd2) != 0 && len(cmd2) < len(cmd) {
 			cmd = cmd2
 		}
+		line = strings.ReplaceAll(line, "##", "  ")
 		line = strings.ReplaceAll(line, "{{COMMAND}}", cmd)
 		line = strings.ReplaceAll(line, "{{OPTION}}", "[OPTION]")
+		line = strings.ReplaceAll(line, "{{#2}}", "##")
 		text += line + "\n"
 	}
 	return text
@@ -180,7 +181,7 @@ func (goargs *GoArgs) Parse(args []string) error {
 			}
 
 			// 存储开关项值
-			if findOut(goargs.options_switchs, name) != -1 {
+			if findOut(goargs.options_switchs, name) != -1 || findOut(goargs.options_switchs, goargs.optionAlias(name)) != -1 {
 				goargs.options_values[name] = "on"
 				continue
 			}
@@ -204,9 +205,17 @@ func (goargs *GoArgs) Parse(args []string) error {
 		if isOptionLongName(item) {
 			// 获取参数名
 			name := getLeft(item, "=")
+
 			if name == "" {
-				return fmt.Errorf("unrecognized option '%s'", item)
+				name = item
+				// 存储开关项值
+				if findOut(goargs.options_switchs, name) != -1 || findOut(goargs.options_switchs, goargs.optionAlias(name)) != -1 {
+					goargs.options_values[name] = "on"
+					continue
+				}
+				return fmt.Errorf("unrecognized option '%s'", name)
 			}
+
 			// 获取参数值
 			value := getRight(item, "=")
 			if value == "" {
@@ -216,11 +225,7 @@ func (goargs *GoArgs) Parse(args []string) error {
 			if findOut(goargs.options, name) < 0 && goargs.optionAlias(name) == "" {
 				return fmt.Errorf("invalid option '%s'", name)
 			}
-			// 存储开关项值
-			if findOut(goargs.options_switchs, name) != -1 {
-				goargs.options_values[name] = "yes"
-				continue
-			}
+
 			goargs.options_values[name] = value
 			continue
 		}
@@ -246,7 +251,12 @@ func (goargs *GoArgs) Parse(args []string) error {
 	for name, argVar := range goargs.argVars {
 		var err error
 		if isOptionShortName(name) || isOptionLongName(name) {
-			err = setValue(name, argVar, goargs.Option(name, ""))
+			value, ok := goargs.options_values[name]
+			if !ok {
+				name = goargs.optionAlias(name)
+			}
+			value, _ = goargs.options_values[name]
+			err = setValue(name, argVar, value)
 		} else {
 			err = setValue(name, argVar, goargs.Operand(name, ""))
 		}
@@ -254,13 +264,16 @@ func (goargs *GoArgs) Parse(args []string) error {
 			return fmt.Errorf("invalid option '%s', because %s", name, err.Error())
 		}
 	}
-
 	return nil
 }
 
 // 字符串值
 func (it *GoArgs) Option(name string, defaultValue string) string {
 	value, ok := it.options_values[name]
+	if ok {
+		return value
+	}
+	value, ok = it.options_values[it.optionAlias(name)]
 	if ok {
 		return value
 	}
@@ -446,24 +459,25 @@ func findOut(list []string, key string) int {
 
 func compileOption(li int, line string, start string) (string, string, error) {
 	// 验证
-	ok, _ := regexp.Match("^\\"+start+"( *\\-{1,2}[a-zA-Z]+[a-zA-Z0-9_\\-]*)(, *\\-{1,2}[a-zA-Z]+[a-zA-Z0-9_\\-]*)?( +.*)?$", []byte(line))
+	ok, _ := regexp.Match("^\\"+start+"( *\\-{1,2}[a-zA-Z]+[a-zA-Z0-9_\\-]*)(, *\\-{1,2}[a-zA-Z]+[a-zA-Z0-9_\\-]*)?( *##+.*)?$", []byte(line))
 	if !ok {
 		return "", "", fmt.Errorf("incorrect line at %d", li)
 	}
-	// option
-	option := getSection(line, start, ",")
-	if option == "" {
-		option = getRight(line, start)
+
+	setstr := getSection(line, start, "##")
+	if setstr == "" {
+		setstr = getRight(line, start)
 	}
+
+	// option
+	option := getLeft(setstr, ",")
 	if option == "" {
-		option = getRight(line, start)
+		option = setstr
 	}
 	option = strings.TrimSpace(option)
+
 	// optionAlias
-	optionAlias := getSection(line, ",", " ")
-	if optionAlias == "" {
-		optionAlias = getRight(line, ",")
-	}
+	optionAlias := getRight(setstr, ",")
 	optionAlias = strings.TrimSpace(optionAlias)
 
 	return option, optionAlias, nil
