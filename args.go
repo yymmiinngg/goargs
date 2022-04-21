@@ -241,6 +241,7 @@ func (goargs *GoArgs) Parse(args []string) error {
 			return fmt.Errorf("missing option '%s'", name)
 		}
 	}
+
 	// 自动处理变量
 	for name, argVar := range goargs.argVars {
 		var err error
@@ -352,43 +353,67 @@ func (it *GoArgs) Float64Var(argName string, float64Var *float64, defaultValue f
 
 func setValue(name string, argVar *ArgVar, value string) error {
 	var err error
-	if value == "" {
-		argVar.varLink = &(argVar.defaultValue)
-	} else {
-		switch argVar.varType {
-		case "string":
+	switch argVar.varType {
+	case "string":
+		if value == "" {
+			*argVar.varLink.(*string) = argVar.defaultValue.(string)
+		} else {
 			*argVar.varLink.(*string) = value
-			break
-		case "bool":
+		}
+		break
+	case "bool":
+		if value == "" {
+			*argVar.varLink.(*bool) = argVar.defaultValue.(bool)
+		} else {
 			v := (value == "on" || value == "yes" || value == "true")
 			*argVar.varLink.(*bool) = v
-			break
-		case "int":
+		}
+		break
+	case "int":
+		if value == "" {
+			*argVar.varLink.(*int) = argVar.defaultValue.(int)
+		} else {
 			var v int
 			v, err = strconv.Atoi(value)
 			*argVar.varLink.(*int) = v
-			break
-		case "int32":
+		}
+		break
+	case "int32":
+		if value == "" {
+			*argVar.varLink.(*int32) = argVar.defaultValue.(int32)
+		} else {
 			var v int64
 			v, err = strconv.ParseInt(value, 10, 32)
 			*argVar.varLink.(*int32) = int32(v)
-			break
-		case "int64":
+		}
+		break
+	case "int64":
+		if value == "" {
+			*argVar.varLink.(*int64) = argVar.defaultValue.(int64)
+		} else {
 			var v int64
 			v, err = strconv.ParseInt(value, 10, 64)
 			*argVar.varLink.(*int64) = v
-			break
-		case "float32":
+		}
+		break
+	case "float32":
+		if value == "" {
+			*argVar.varLink.(*float32) = argVar.defaultValue.(float32)
+		} else {
 			var v float64
 			v, err = strconv.ParseFloat(value, 32)
 			*argVar.varLink.(*float32) = float32(v)
-			break
-		case "float64":
+		}
+		break
+	case "float64":
+		if value == "" {
+			*argVar.varLink.(*float64) = argVar.defaultValue.(float64)
+		} else {
 			var v float64
 			v, err = strconv.ParseFloat(value, 64)
 			*argVar.varLink.(*float64) = v
-			break
 		}
+		break
 	}
 
 	return err

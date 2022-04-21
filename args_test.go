@@ -46,13 +46,13 @@ func Test(t *testing.T) {
 		return
 	}
 	args.StringVar("-o", &outputDir, "")
-	args.StringVar("FILE1", &FILE1, "")
-	args.StringVar("FILE2", &FILE2, "")
+	args.StringVar("FILE1", &FILE1, "./")
+	args.StringVar("FILE2", &FILE2, "./")
 	args.StringVar("URL", &URL, "")
 	args.BoolVar("-A", &A, true)
 	args.IntVar("-s", &s, -1)
 
-	var argsArr = []string{"c:/window\\main.exe", "-T", "yes", "https://www.google.com", "e:\\", "d:\\", "-o", "d://", "-s", "d10"}
+	var argsArr = []string{"c:/window\\main.exe", "-T", "yes", "https://www.google.com", "d:\\", "-o", "d://", "-s", "10"}
 
 	if err := args.Parse(argsArr); err != nil {
 		fmt.Println(err.Error())
