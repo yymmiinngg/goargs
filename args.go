@@ -280,6 +280,15 @@ func (it *GoArgs) Option(name string, defaultValue string) string {
 	return defaultValue
 }
 
+// 所有选项
+func (it *GoArgs) Options() map[string]string {
+	cloneTags := make(map[string]string)
+	for k, v := range it.options_values {
+		cloneTags[k] = v
+	}
+	return cloneTags
+}
+
 // bool值
 func (it *GoArgs) Has(name string, defaultValue bool) bool {
 	if findOut(it.options_switchs, name) < 0 {
@@ -287,6 +296,11 @@ func (it *GoArgs) Has(name string, defaultValue bool) bool {
 	}
 	value, ok := it.options_values[name]
 	return ok && (value == "on" || value == "yes" || value == "true")
+}
+
+// 所有参数
+func (it *GoArgs) Operands() []string {
+	return append([]string{}, it.operans_value...)
 }
 
 // 根据命名获取参数值
