@@ -19,7 +19,8 @@ type GoArgs struct {
 	options_requires []string          // 选项必填项
 	options_switchs  []string          // 开关选项
 
-	argVars map[string]*ArgVar
+	argVars      map[string]*ArgVar
+	parseOptions []ParseOption
 }
 
 type ArgVar struct {
@@ -27,6 +28,10 @@ type ArgVar struct {
 	varLink      interface{}
 	defaultValue interface{}
 }
+
+type ParseOption int
+
+const AllowUnknowOption ParseOption = 1 // 允许未知参数
 
 // 编译参数处理模板
 func Compile(template string) (*GoArgs, error) {
@@ -41,6 +46,7 @@ func Compile(template string) (*GoArgs, error) {
 		options_requires: make([]string, 0),
 		options_switchs:  make([]string, 0),
 		argVars:          make(map[string]*ArgVar, 0),
+		parseOptions:     make([]ParseOption, 0),
 	}
 	lines := strings.Split(template, "\n")
 	li := 0
@@ -158,7 +164,8 @@ func (goargs *GoArgs) Usage() string {
 }
 
 // 处理参数
-func (goargs *GoArgs) Parse(args []string) error {
+func (goargs *GoArgs) Parse(args []string, parseOptions ...ParseOption) error {
+	goargs.parseOptions = append(goargs.parseOptions, parseOptions...)
 	li := -1
 	for true {
 		li++
@@ -223,7 +230,9 @@ func (goargs *GoArgs) Parse(args []string) error {
 			}
 			// 参数是否定义
 			if findOut(goargs.options, name) < 0 && goargs.optionAlias(name) == "" {
-				return fmt.Errorf("invalid option '%s'", name)
+				if findOutParseOption(goargs.parseOptions, AllowUnknowOption) < 0 {
+					return fmt.Errorf("invalid option '%s'", name)
+				}
 			}
 
 			goargs.options_values[name] = value
@@ -463,6 +472,15 @@ func isOptionShortName(item string) bool {
 }
 
 func findOut(list []string, key string) int {
+	for i := 0; i < len(list); i++ {
+		if list[i] == key {
+			return i
+		}
+	}
+	return -1
+}
+
+func findOutParseOption(list []ParseOption, key ParseOption) int {
 	for i := 0; i < len(list); i++ {
 		if list[i] == key {
 			return i
