@@ -30,6 +30,8 @@ func Test(t *testing.T) {
 		cat f - g  Output f's contents, then standard input, then g's contents.
 		cat        Copy standard input to standard output.
 
+		
+		
 		Report cat bugs to bug-coreutils@gnu.org
 		GNU coreutils home page: <http://www.gnu.org/software/coreutils/>
 		General help using GNU software: <http://www.gnu.org/gethelp/>
@@ -55,9 +57,9 @@ func Test(t *testing.T) {
 	args.IntVar("-s", &s, -1)
 	args.IntVar("--show-tabs", &T, -1)
 
-	var argsArr = []string{"c:/window\\main.exe", "-T", "10", "-o", "d://", "90", "https://www.google.com", "-s", "10", "--help", "false"}
+	var argsArr = []string{"c:/window\\main.exe", "-T", "10", "-o", "d://", "90", "https://www.google.com", "-s", "10", "--help", "false", "-p"}
 
-	if err := args.Parse(argsArr); err != nil {
+	if err := args.Parse(argsArr, AllowUnknowOption); err != nil {
 		fmt.Println(err.Error())
 		fmt.Println(args.Usage())
 		return

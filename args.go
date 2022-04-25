@@ -182,8 +182,12 @@ func (goargs *GoArgs) Parse(args []string, parseOptions ...ParseOption) error {
 		// 选项格式 -name value
 		if isOptionShortName(item) {
 			name := item
+
 			// 参数是否定义
 			if findOut(goargs.options, name) < 0 && goargs.optionAlias(name) == "" {
+				if findOutParseOption(goargs.parseOptions, AllowUnknowOption) != -1 {
+					goto doOperan
+				}
 				return fmt.Errorf("invalid option '%s'", name)
 			}
 
@@ -228,17 +232,20 @@ func (goargs *GoArgs) Parse(args []string, parseOptions ...ParseOption) error {
 			if value == "" {
 				return fmt.Errorf("unrecognized option '%s'", item)
 			}
+
 			// 参数是否定义
 			if findOut(goargs.options, name) < 0 && goargs.optionAlias(name) == "" {
-				if findOutParseOption(goargs.parseOptions, AllowUnknowOption) < 0 {
-					return fmt.Errorf("invalid option '%s'", name)
+				if findOutParseOption(goargs.parseOptions, AllowUnknowOption) != -1 {
+					goto doOperan
 				}
+				return fmt.Errorf("invalid option '%s'", name)
 			}
 
 			goargs.options_values[name] = value
 			continue
 		}
 
+	doOperan:
 		// 参数
 		goargs.operans_value = append(goargs.operans_value, item)
 	}
