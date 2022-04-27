@@ -8,6 +8,7 @@ GOLang的参数处理工具
 ## 示例
 
 ``` go
+// 这里可以替换成 os.Args 以处理控制台命令行
 var argsArr = []string{"clone", "-c", "-b", "10240", "/etc/my.cnf", "/etc/my.cnf.bak1", "/etc/my.cnf.bak2", "--help"}
 
 // 模板
@@ -103,7 +104,7 @@ Usage: clone [OPTION]... SRC [DEST]...
 
 | 常量 | 说明 |
 |:-|:-|
-| {{COMMAND}} | 控制台，将参数列表中的命令项（通常为第1项）渲染到Usage()输出中。 |
+| {{COMMAND}} | 程序命令，将参数列表中的命令项（通常为第1项）渲染到Usage()输出中。 |
 | {{OPTION}} | 参数项，将被替换成 \[OPTION\]... |
 
 ### 模板行类型

@@ -7,6 +7,7 @@ import (
 
 func Test(t *testing.T) {
 
+	// 这里可以替换成 `os.Args` 以处理控制台命令行
 	var argsArr = []string{"clone", "-c", "-b", "10240", "/etc/my.cnf", "/etc/my.cnf.bak1", "/etc/my.cnf.bak2", "--help"}
 
 	// 模板
