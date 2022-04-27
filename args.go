@@ -13,14 +13,15 @@ type GoArgs struct {
 	operans          []string          // 参数名称
 	operans_value    []string          // 参数值
 	operans_requires []string          // 参数必填项
+	operans_arr_item string            // 参数数组项
 	options          []string          // 选项名称
 	options_values   map[string]string // 选项值 <name,value>
 	options_alias    map[string]string // 选项别名 <alias,name> AND <name,alias>
 	options_requires []string          // 选项必填项
 	options_switchs  []string          // 开关选项
-
-	argVars      map[string]*ArgVar
-	parseOptions []ParseOption
+	optionVars       map[string]*ArgVar
+	operanVars       map[string]*ArgVar
+	parseOptions     []ParseOption
 }
 
 type ArgVar struct {
@@ -40,12 +41,14 @@ func Compile(template string) (*GoArgs, error) {
 		operans:          make([]string, 0),
 		operans_value:    make([]string, 0),
 		operans_requires: make([]string, 0),
+		operans_arr_item: "",
 		options:          make([]string, 0),
 		options_values:   make(map[string]string, 0),
 		options_alias:    make(map[string]string, 0),
 		options_requires: make([]string, 0),
 		options_switchs:  make([]string, 0),
-		argVars:          make(map[string]*ArgVar, 0),
+		optionVars:       make(map[string]*ArgVar, 0),
+		operanVars:       make(map[string]*ArgVar, 0),
 		parseOptions:     make([]ParseOption, 0),
 	}
 	lines := strings.Split(template, "\n")
@@ -63,10 +66,10 @@ func Compile(template string) (*GoArgs, error) {
 			regOperanName, _ := regexp.Compile("^[a-zA-Z]+[a-zA-Z0-9_\\-]*$")
 
 			// 普通参数
-			reg, _ := regexp.Compile("(\\[[^\\[\\]]+\\])")
+			reg, _ := regexp.Compile("(\\[[^\\[\\]]+\\]\\.\\.\\.)|(\\[[^\\[\\]]+\\])")
 			operan := reg.FindAll([]byte(line), 1000)
 			// 必须参数
-			regRequire, _ := regexp.Compile("(<[^<>]+>)")
+			regRequire, _ := regexp.Compile("(<[^<>]+>\\.\\.\\.)|(<[^<>]+>)")
 			operanRequire := regRequire.FindAll([]byte(line), 1000)
 
 			// 检查顺序
@@ -74,7 +77,7 @@ func Compile(template string) (*GoArgs, error) {
 				firstName := operan[0]
 				for _, requireName := range operanRequire {
 					if strings.Index(line, string(requireName)) > strings.Index(line, string(firstName)) {
-						return nil, fmt.Errorf("required operan '%s' on the right of '%s', in line %d", requireName, firstName, li)
+						return nil, fmt.Errorf("required operan '%s' at the right of '%s'", requireName, firstName)
 					}
 				}
 			}
@@ -82,6 +85,12 @@ func Compile(template string) (*GoArgs, error) {
 			if len(operanRequire) > 0 {
 				for _, name := range operanRequire {
 					operanName := getSection(string(name), "<", ">")
+					if strings.Index(string(name), "...") > 0 {
+						if goargs.operans_arr_item != "" {
+							return nil, fmt.Errorf("just only one list operan allowed in usage line")
+						}
+						goargs.operans_arr_item = operanName
+					}
 					if !regOperanName.Match([]byte(operanName)) {
 						return nil, fmt.Errorf("invalid operan name '%s' in line %d", operanName, li)
 					}
@@ -93,11 +102,21 @@ func Compile(template string) (*GoArgs, error) {
 			if len(operan) > 0 {
 				for _, name := range operan {
 					operanName := getSection(string(name), "[", "]")
+					if strings.Index(string(name), "...") > 0 {
+						if goargs.operans_arr_item != "" {
+							return nil, fmt.Errorf("just only one list operan allowed in usage line")
+						}
+						goargs.operans_arr_item = operanName
+					}
 					if !regOperanName.Match([]byte(operanName)) {
 						return nil, fmt.Errorf("invalid operan name '%s' in line %d", operanName, li)
 					}
 					goargs.operans = append(goargs.operans, operanName)
 				}
+			}
+
+			if goargs.operans_arr_item != "" && findOut(goargs.operans, goargs.operans_arr_item) != len(goargs.operans)-1 {
+				return nil, fmt.Errorf("list operan '%s' need at then end of usage line", goargs.operans_arr_item)
 			}
 		}
 
@@ -140,6 +159,10 @@ func (goargs *GoArgs) Usage() string {
 			text += "\n"
 			continue
 		}
+		if strings.Index(line, "Usage:") != -1 {
+			line = strings.ReplaceAll(line, "<", "")
+			line = strings.ReplaceAll(line, ">", "")
+		}
 		startChar := string(line[0])
 		if strings.Index("+*?#", startChar) != -1 {
 			line = " " + line[1:]
@@ -154,10 +177,9 @@ func (goargs *GoArgs) Usage() string {
 		if len(cmd2) != 0 && len(cmd2) < len(cmd) {
 			cmd = cmd2
 		}
-		line = strings.ReplaceAll(line, "##", "  ")
 		line = strings.ReplaceAll(line, "{{COMMAND}}", cmd)
-		line = strings.ReplaceAll(line, "{{OPTION}}", "[OPTION]")
-		line = strings.ReplaceAll(line, "{{#2}}", "##")
+		line = strings.ReplaceAll(line, "{{OPTION}}", "[OPTION]...")
+		line = strings.Replace(line, "##", "  ", 1)
 		text += line + "\n"
 	}
 	return text
@@ -263,24 +285,57 @@ func (goargs *GoArgs) Parse(args []string, parseOptions ...ParseOption) error {
 		}
 	}
 
-	// 自动处理变量
-	for name, argVar := range goargs.argVars {
+	// 自动处理参数变量
+	for name, argVar := range goargs.operanVars {
 		var err error
-		if isOptionShortName(name) || isOptionLongName(name) {
-			value, ok := goargs.options_values[name]
-			if !ok {
-				name = goargs.optionAlias(name)
+		if argVar.varType == "[]string" {
+			if goargs.operans_arr_item == "" || name != goargs.operans_arr_item {
+				return fmt.Errorf("list operan '%s' not found in usage", name)
 			}
-			value, _ = goargs.options_values[name]
-			err = setValue(name, argVar, value)
+			err = setValue(name, argVar, goargs.OperandStrings(name, nil))
 		} else {
+			if name == goargs.operans_arr_item {
+				return fmt.Errorf("'%s' is not a single operan in usage", name)
+			}
 			err = setValue(name, argVar, goargs.Operand(name, ""))
 		}
 		if err != nil {
 			return fmt.Errorf("invalid option '%s', because %s", name, err.Error())
 		}
 	}
+
+	// 自动处理选项变量
+	for name, argVar := range goargs.optionVars {
+		if !(isOptionLongName(name) || isOptionShortName(name)) {
+			return fmt.Errorf("invalid option '%s'", name)
+		}
+		var err error
+		value, ok := goargs.options_values[name]
+		if !ok {
+			name = goargs.optionAlias(name)
+		}
+		value, _ = goargs.options_values[name]
+		err = setValue(name, argVar, value)
+		if err != nil {
+			return fmt.Errorf("invalid option '%s', because %s", name, err.Error())
+		}
+	}
+
 	return nil
+}
+
+// 所有参数
+func (it *GoArgs) AllOperand() []string {
+	return append([]string{}, it.operans_value...)
+}
+
+// 所有选项
+func (it *GoArgs) AllOption() map[string]string {
+	cloneTags := make(map[string]string)
+	for k, v := range it.options_values {
+		cloneTags[k] = v
+	}
+	return cloneTags
 }
 
 // 字符串值
@@ -296,15 +351,6 @@ func (it *GoArgs) Option(name string, defaultValue string) string {
 	return defaultValue
 }
 
-// 所有选项
-func (it *GoArgs) Options() map[string]string {
-	cloneTags := make(map[string]string)
-	for k, v := range it.options_values {
-		cloneTags[k] = v
-	}
-	return cloneTags
-}
-
 // bool值
 func (it *GoArgs) Has(name string, defaultValue bool) bool {
 	if findOut(it.options_switchs, name) < 0 {
@@ -312,11 +358,6 @@ func (it *GoArgs) Has(name string, defaultValue bool) bool {
 	}
 	value, ok := it.options_values[name]
 	return ok && (value == "on" || value == "yes" || value == "true")
-}
-
-// 所有参数
-func (it *GoArgs) Operands() []string {
-	return append([]string{}, it.operans_value...)
 }
 
 // 根据命名获取参数值
@@ -328,7 +369,25 @@ func (it *GoArgs) Operand(name string, defaultValue string) string {
 	if li >= len(it.operans_value) {
 		return defaultValue
 	}
+	if it.operans_arr_item == name {
+		return defaultValue
+	}
 	return it.operans_value[li]
+}
+
+// 根据命名获取参数值(数组)
+func (it *GoArgs) OperandStrings(name string, defaultValue []string) []string {
+	li := findOut(it.operans, name)
+	if li == -1 {
+		return defaultValue
+	}
+	if it.operans_arr_item != name {
+		return defaultValue
+	}
+	if li >= len(it.operans_value) {
+		return defaultValue
+	}
+	return it.operans_value[li:]
 }
 
 // 根据位置获取参数值
@@ -339,69 +398,135 @@ func (it *GoArgs) OperandAt(index int, defaultValue string) string {
 	return defaultValue
 }
 
-func (it *GoArgs) StringVar(argName string, strVar *string, defaultValue string) {
-	it.argVars[argName] = &ArgVar{
+// 参数
+func (it *GoArgs) StringOperan(argName string, strVar *string, defaultValue string) {
+	it.operanVars[argName] = &ArgVar{
 		varType:      "string",
 		varLink:      strVar,
 		defaultValue: defaultValue,
 	}
 }
-func (it *GoArgs) BoolVar(argName string, boolVar *bool, defaultValue bool) {
-	it.argVars[argName] = &ArgVar{
-		varType:      "bool",
-		varLink:      boolVar,
+
+func (it *GoArgs) StringsOperan(argName string, strVar *[]string, defaultValue []string) {
+	it.operanVars[argName] = &ArgVar{
+		varType:      "[]string",
+		varLink:      strVar,
 		defaultValue: defaultValue,
 	}
 }
 
-func (it *GoArgs) IntVar(argName string, intVar *int, defaultValue int) {
-	it.argVars[argName] = &ArgVar{
+func (it *GoArgs) IntOperan(argName string, strVar *string, defaultValue string) {
+	it.operanVars[argName] = &ArgVar{
 		varType:      "int",
-		varLink:      intVar,
+		varLink:      strVar,
 		defaultValue: defaultValue,
 	}
 }
 
-func (it *GoArgs) Int32Var(argName string, int32Var *int32, defaultValue int32) {
-	it.argVars[argName] = &ArgVar{
+func (it *GoArgs) Int32Operan(argName string, int32Var *int32, defaultValue int32) {
+	it.operanVars[argName] = &ArgVar{
 		varType:      "int32",
 		varLink:      int32Var,
 		defaultValue: defaultValue,
 	}
 }
 
-func (it *GoArgs) Int64Var(argName string, int64Var *int64, defaultValue int64) {
-	it.argVars[argName] = &ArgVar{
+func (it *GoArgs) Int64Operan(argName string, int64Var *int64, defaultValue int64) {
+	it.operanVars[argName] = &ArgVar{
 		varType:      "int64",
 		varLink:      int64Var,
 		defaultValue: defaultValue,
 	}
 }
 
-func (it *GoArgs) Float32Var(argName string, float32Var *float32, defaultValue float32) {
-	it.argVars[argName] = &ArgVar{
+func (it *GoArgs) Float32Operan(argName string, float32Var *float32, defaultValue float32) {
+	it.operanVars[argName] = &ArgVar{
 		varType:      "float32",
 		varLink:      float32Var,
 		defaultValue: defaultValue,
 	}
 }
 
-func (it *GoArgs) Float64Var(argName string, float64Var *float64, defaultValue float64) {
-	it.argVars[argName] = &ArgVar{
+func (it *GoArgs) Float64Operan(argName string, float64Var *float64, defaultValue float64) {
+	it.operanVars[argName] = &ArgVar{
 		varType:      "float64",
 		varLink:      float64Var,
 		defaultValue: defaultValue,
 	}
 }
 
-func setValue(name string, argVar *ArgVar, value string) error {
+// 选项
+func (it *GoArgs) StringOption(argName string, strVar *string, defaultValue string) {
+	it.optionVars[argName] = &ArgVar{
+		varType:      "string",
+		varLink:      strVar,
+		defaultValue: defaultValue,
+	}
+}
+
+func (it *GoArgs) BoolOption(argName string, boolVar *bool, defaultValue bool) {
+	it.optionVars[argName] = &ArgVar{
+		varType:      "bool",
+		varLink:      boolVar,
+		defaultValue: defaultValue,
+	}
+}
+
+func (it *GoArgs) IntOption(argName string, intVar *int, defaultValue int) {
+	it.optionVars[argName] = &ArgVar{
+		varType:      "int",
+		varLink:      intVar,
+		defaultValue: defaultValue,
+	}
+}
+
+func (it *GoArgs) Int32Option(argName string, int32Var *int32, defaultValue int32) {
+	it.optionVars[argName] = &ArgVar{
+		varType:      "int32",
+		varLink:      int32Var,
+		defaultValue: defaultValue,
+	}
+}
+
+func (it *GoArgs) Int64Option(argName string, int64Var *int64, defaultValue int64) {
+	it.optionVars[argName] = &ArgVar{
+		varType:      "int64",
+		varLink:      int64Var,
+		defaultValue: defaultValue,
+	}
+}
+
+func (it *GoArgs) Float32Option(argName string, float32Var *float32, defaultValue float32) {
+	it.optionVars[argName] = &ArgVar{
+		varType:      "float32",
+		varLink:      float32Var,
+		defaultValue: defaultValue,
+	}
+}
+
+func (it *GoArgs) Float64Option(argName string, float64Var *float64, defaultValue float64) {
+	it.optionVars[argName] = &ArgVar{
+		varType:      "float64",
+		varLink:      float64Var,
+		defaultValue: defaultValue,
+	}
+}
+
+func setValue(name string, argVar *ArgVar, value interface{}) error {
 	var err error
 	switch argVar.varType {
 	case "string":
 		if value == "" {
 			*argVar.varLink.(*string) = argVar.defaultValue.(string)
 		} else {
-			*argVar.varLink.(*string) = value
+			*argVar.varLink.(*string) = value.(string)
+		}
+		break
+	case "[]string":
+		if value == nil || len(value.([]string)) == 0 {
+			*argVar.varLink.(*[]string) = argVar.defaultValue.([]string)
+		} else {
+			*argVar.varLink.(*[]string) = value.([]string)
 		}
 		break
 	case "bool":
@@ -417,7 +542,7 @@ func setValue(name string, argVar *ArgVar, value string) error {
 			*argVar.varLink.(*int) = argVar.defaultValue.(int)
 		} else {
 			var v int
-			v, err = strconv.Atoi(value)
+			v, err = strconv.Atoi(value.(string))
 			*argVar.varLink.(*int) = v
 		}
 		break
@@ -426,7 +551,7 @@ func setValue(name string, argVar *ArgVar, value string) error {
 			*argVar.varLink.(*int32) = argVar.defaultValue.(int32)
 		} else {
 			var v int64
-			v, err = strconv.ParseInt(value, 10, 32)
+			v, err = strconv.ParseInt(value.(string), 10, 32)
 			*argVar.varLink.(*int32) = int32(v)
 		}
 		break
@@ -435,7 +560,7 @@ func setValue(name string, argVar *ArgVar, value string) error {
 			*argVar.varLink.(*int64) = argVar.defaultValue.(int64)
 		} else {
 			var v int64
-			v, err = strconv.ParseInt(value, 10, 64)
+			v, err = strconv.ParseInt(value.(string), 10, 64)
 			*argVar.varLink.(*int64) = v
 		}
 		break
@@ -444,7 +569,7 @@ func setValue(name string, argVar *ArgVar, value string) error {
 			*argVar.varLink.(*float32) = argVar.defaultValue.(float32)
 		} else {
 			var v float64
-			v, err = strconv.ParseFloat(value, 32)
+			v, err = strconv.ParseFloat(value.(string), 32)
 			*argVar.varLink.(*float32) = float32(v)
 		}
 		break
@@ -453,7 +578,7 @@ func setValue(name string, argVar *ArgVar, value string) error {
 			*argVar.varLink.(*float64) = argVar.defaultValue.(float64)
 		} else {
 			var v float64
-			v, err = strconv.ParseFloat(value, 64)
+			v, err = strconv.ParseFloat(value.(string), 64)
 			*argVar.varLink.(*float64) = v
 		}
 		break

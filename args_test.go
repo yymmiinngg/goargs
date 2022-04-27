@@ -6,73 +6,70 @@ import (
 )
 
 func Test(t *testing.T) {
+
+	var argsArr = []string{"clone", "-c", "-b", "10240", "/etc/my.cnf", "/etc/my.cnf.bak1", "/etc/my.cnf.bak2", "--help"}
+
+	// 模板
 	template := `
-		Usage: {{COMMAND}} {{OPTION}}... <NUMBER> <URL> [FILE1] [FILE2]
-		Concatenate FILE(s), or standard input, to standard output.
-
-		+ -o, --output           ## output dir
-		? -A, --show-all         ## equivalent to -vET
-		+ -b, --number-nonblank  ## number nonempty output lines
-		? -e                     ## equivalent to -vE
-		? -E, --show-ends        ## display $ at end of each line
-		+ -n, --number           ## number all output lines
-		+ -s, --squeeze-blank    ## suppress repeated empty output lines
-		? -t                     ## equivalent to -vT
-		* -T, --show-tabs        ## display TAB characters as ^I
-		? -u                     ## (ignored)
-		? -v, --show-nonprinting ## use ^ and M- notation, except for LFD and TAB
-		?     --help             ## display this help and exit
-		?     --version          ## output version information and exit
-
-		With no FILE, or when FILE is -, read standard input.
-
-		Examples:
-		cat f - g  Output f's contents, then standard input, then g's contents.
-		cat        Copy standard input to standard output.
-
+		Usage: {{COMMAND}} {{OPTION}} <SRC> [DEST]...
+		将文件克隆成多个副本, SRC 源文件, DEST... 目标文件列表（默认为"$SRC.bak"）
 		
+		? -c, --check-space  ## 克隆前检查所须空间
+		+ -b, --buffer-size  ## 缓冲区大小(用于复制转移数据的临时内存空间大小)
+		#                       默认值为：1024
+		?     --help         ## 显示帮助后退出
+		?     --version      ## 显示版本后退出
 		
-		Report cat bugs to bug-coreutils@gnu.org
-		GNU coreutils home page: <http://www.gnu.org/software/coreutils/>
-		General help using GNU software: <http://www.gnu.org/gethelp/>
-		For complete documentation, run: info coreutils 'cat invocation'
+		更多细节及说明请访问 https://xxx.xxxxx.xx
 	`
 
-	var outputDir, FILE1, FILE2, URL string
-	var A, help bool
-	var NUMBER, s, T int
+	// 定义变量
+	var SRC string
+	var DEST []string
+	var c, help, version bool
+	var b int
 
+	// 编译模板
 	args, err := Compile(template)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	args.IntVar("NUMBER", &NUMBER, -1)
-	args.StringVar("FILE1", &FILE1, "./")
-	args.StringVar("FILE2", &FILE2, "./")
-	args.StringVar("URL", &URL, "")
-	args.StringVar("-o", &outputDir, "")
-	args.BoolVar("--show-all", &A, true)
-	args.BoolVar("--help", &help, false)
-	args.IntVar("-s", &s, -1)
-	args.IntVar("--show-tabs", &T, -1)
 
-	var argsArr = []string{"c:/window\\main.exe", "-T", "10", "-o", "d://", "90", "https://www.google.com", "-s", "10", "--help", "false", "-p"}
+	// 绑定变量
+	args.StringOperan("SRC", &SRC, "")
+	args.StringsOperan("DEST", &DEST, nil)
+	args.BoolOption("-c", &c, false)
+	args.IntOption("-b", &b, 1024)
+	args.BoolOption("--help", &help, false)
+	args.BoolOption("--version", &version, false)
 
+	// 处理参数
 	if err := args.Parse(argsArr, AllowUnknowOption); err != nil {
 		fmt.Println(err.Error())
 		fmt.Println(args.Usage())
 		return
 	}
-	fmt.Println(">>>>>>>> ", "NUMBER", NUMBER)
-	fmt.Println(">>>>>>>> ", "-o", outputDir)
-	fmt.Println(">>>>>>>> ", "FILE1", FILE1)
-	fmt.Println(">>>>>>>> ", "FILE2", FILE2)
-	fmt.Println(">>>>>>>> ", "URL", URL)
-	fmt.Println(">>>>>>>> ", "-A", A)
-	fmt.Println(">>>>>>>> ", "--help", help)
-	fmt.Println(">>>>>>>> ", "-s", s)
-	fmt.Println(">>>>>>>> ", "--show-tabs", T)
 
-	// fmt.Println(args.Usage())
+	//  输出
+
+	fmt.Println("--------------------------------------------------")
+	fmt.Printf("%12s  %v \n", "SRC", SRC)
+	fmt.Printf("%12s  %v \n", "DEST", DEST)
+	fmt.Printf("%12s  %v \n", "-c", c)
+	fmt.Printf("%12s  %v \n", "-b", b)
+	fmt.Printf("%12s  %v \n", "--help", help)
+	fmt.Printf("%12s  %v \n", "--vesrion", version)
+	fmt.Println("--------------------------------------------------")
+
+	if help {
+		fmt.Println(args.Usage())
+		return
+	}
+
+	if help {
+		fmt.Println("v0.0.1")
+		return
+	}
+
 }
