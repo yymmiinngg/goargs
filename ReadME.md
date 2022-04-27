@@ -8,6 +8,9 @@ GOLang的参数处理工具
 ## 示例
 
 ``` go
+// 导入依赖
+import goargs "github.com/yymmiinngg/goargs"
+
 // 这里可以替换成 os.Args 以处理控制台命令行
 var argsArr = []string{"clone", "-c", "-b", "10240", "/etc/my.cnf", "/etc/my.cnf.bak1", "/etc/my.cnf.bak2", "--help"}
 
@@ -25,14 +28,14 @@ template := `
     更多细节及说明请访问 https://xxx.xxxxx.xx
 `
 
-// 定义变量
+// 声明变量
 var SRC string
 var DEST []string
 var c, help, version bool
 var b int
 
 // 编译模板
-args, err := Compile(template)
+args, err := goargs.Compile(template)
 if err != nil {
     fmt.Println(err.Error())
     return
