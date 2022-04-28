@@ -149,6 +149,16 @@ func Compile(template string) (*GoArgs, error) {
 	return &goargs, nil
 }
 
+// 是否是Help
+func (goargs *GoArgs) IsHelp(args []string, help ...string) bool {
+	for _, h := range help {
+		if findOut(args, h) != -1 {
+			return true
+		}
+	}
+	return false
+}
+
 // 使用方法
 func (goargs *GoArgs) Usage() string {
 	lines := strings.Split(strings.TrimSpace(goargs.template), "\n")
