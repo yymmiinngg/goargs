@@ -149,16 +149,6 @@ func Compile(template string) (*GoArgs, error) {
 	return &goargs, nil
 }
 
-// 是否是Help
-func (goargs *GoArgs) IsHelp(args []string, help ...string) bool {
-	for _, h := range help {
-		if findOut(args, h) != -1 {
-			return true
-		}
-	}
-	return false
-}
-
 // 使用方法
 func (goargs *GoArgs) Usage() string {
 	lines := strings.Split(strings.TrimSpace(goargs.template), "\n")
@@ -174,7 +164,11 @@ func (goargs *GoArgs) Usage() string {
 			line = strings.ReplaceAll(line, ">", "")
 		}
 		startChar := string(line[0])
-		if strings.Index("+*?#", startChar) != -1 {
+		if strings.Index("+*?", startChar) != -1 {
+			line = " " + line[1:]
+			line = strings.Replace(line, "#", " ", 1)
+		}
+		if startChar == "#" {
 			line = " " + line[1:]
 		}
 
@@ -189,7 +183,6 @@ func (goargs *GoArgs) Usage() string {
 		}
 		line = strings.ReplaceAll(line, "{{COMMAND}}", cmd)
 		line = strings.ReplaceAll(line, "{{OPTION}}", "[OPTION]...")
-		line = strings.Replace(line, "##", "  ", 1)
 		text += line + "\n"
 	}
 	return text
@@ -256,13 +249,10 @@ func (goargs *GoArgs) Parse(args []string, parseOptions ...ParseOption) error {
 					goargs.options_values[name] = "on"
 					continue
 				}
+				if findOutParseOption(goargs.parseOptions, AllowUnknowOption) != -1 {
+					goto doOperan
+				}
 				return fmt.Errorf("unrecognized option '%s'", name)
-			}
-
-			// 获取参数值
-			value := getRight(item, "=")
-			if value == "" {
-				return fmt.Errorf("unrecognized option '%s'", item)
 			}
 
 			// 参数是否定义
@@ -271,6 +261,12 @@ func (goargs *GoArgs) Parse(args []string, parseOptions ...ParseOption) error {
 					goto doOperan
 				}
 				return fmt.Errorf("invalid option '%s'", name)
+			}
+
+			// 获取参数值
+			value := getRight(item, "=")
+			if value == "" {
+				return fmt.Errorf("unrecognized option '%s'", name)
 			}
 
 			goargs.options_values[name] = value
@@ -332,6 +328,16 @@ func (goargs *GoArgs) Parse(args []string, parseOptions ...ParseOption) error {
 	}
 
 	return nil
+}
+
+// 是否存在参数项
+func HasArgs(args []string, options ...string) bool {
+	for _, h := range options {
+		if findOut(args, h) != -1 {
+			return true
+		}
+	}
+	return false
 }
 
 // 所有参数
@@ -633,12 +639,12 @@ func findOutParseOption(list []ParseOption, key ParseOption) int {
 
 func compileOption(li int, line string, start string) (string, string, error) {
 	// 验证
-	ok, _ := regexp.Match("^\\"+start+"( *\\-{1,2}[a-zA-Z]+[a-zA-Z0-9_\\-]*)(, *\\-{1,2}[a-zA-Z]+[a-zA-Z0-9_\\-]*)?( *##+.*)?$", []byte(line))
+	ok, _ := regexp.Match("^\\"+start+"( *\\-{1,2}[a-zA-Z]+[a-zA-Z0-9_\\-]*)(, *\\-{1,2}[a-zA-Z]+[a-zA-Z0-9_\\-]*)?( *#+.*)?$", []byte(line))
 	if !ok {
 		return "", "", fmt.Errorf("incorrect line at %d", li)
 	}
 
-	setstr := getSection(line, start, "##")
+	setstr := getSection(line, start, "#")
 	if setstr == "" {
 		setstr = getRight(line, start)
 	}
