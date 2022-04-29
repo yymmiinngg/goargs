@@ -10,7 +10,7 @@ import (
 func Test(t *testing.T) {
 
 	// 这里可以替换成 `os.Args` 以处理控制台命令行
-	var argsArr = []string{"clone", "-c", "-b", "10240", "/etc/my.cnf", "/etc/my.cnf.bak1", "/etc/my.cnf.bak2", "--help"}
+	var argsArr = []string{"clone", "-c", "-b", "10240", "/etc/my.cnf", "/etc/my.cnf.bak1", "/etc/my.cnf.bak2", "-H", "--version"}
 
 	// 模板
 	template := `
@@ -20,8 +20,8 @@ func Test(t *testing.T) {
 		? -c, --check-space  # 克隆前检查所须空间
 		+ -b, --buffer-size  # 缓冲区大小(用于复制转移数据的临时内存空间大小)
 		#                      默认值为: 1024
-		# -H, --help           显示帮助后退出
-		#     --version        显示版本后退出
+		? -H, --help         # 显示帮助后退出
+		?     --version      # 显示版本后退出
 		
 		更多细节及说明请访问 https://xxx.xxxxx.xx
 	`
@@ -41,11 +41,13 @@ func Test(t *testing.T) {
 
 	// 显示帮助
 	if goargs.HasArgs(argsArr, "-H", "--help") {
+		fmt.Println("--------------------------------------------------")
 		fmt.Println(args.Usage())
 	}
 
 	// 显示版本
 	if goargs.HasArgs(argsArr, "--version") {
+		fmt.Println("--------------------------------------------------")
 		fmt.Println("v0.0.1")
 	}
 
@@ -68,6 +70,5 @@ func Test(t *testing.T) {
 	fmt.Printf("%12s  %v \n", "DEST", DEST)
 	fmt.Printf("%12s  %v \n", "-c", c)
 	fmt.Printf("%12s  %v \n", "-b", b)
-	fmt.Println("--------------------------------------------------")
 
 }
