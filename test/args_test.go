@@ -20,8 +20,8 @@ func Test(t *testing.T) {
 		? -c, --check-space  # 克隆前检查所须空间
 		+ -b, --buffer-size  # 缓冲区大小(用于复制转移数据的临时内存空间大小)
 		#                      默认值为: 1024
-		?     --help         # 显示帮助后退出
-		?     --version      # 显示版本后退出
+		# -H, --help           显示帮助后退出
+		#     --version        显示版本后退出
 		
 		更多细节及说明请访问 https://xxx.xxxxx.xx
 	`
@@ -29,7 +29,7 @@ func Test(t *testing.T) {
 	// 定义变量
 	var SRC string
 	var DEST []string
-	var c, help, version bool
+	var c bool
 	var b int
 
 	// 编译模板
@@ -39,9 +39,14 @@ func Test(t *testing.T) {
 		return
 	}
 
-	if args.IsHelp(argsArr, "--help") {
+	// 显示帮助
+	if goargs.HasArgs(argsArr, "-H", "--help") {
 		fmt.Println(args.Usage())
-		return
+	}
+
+	// 显示版本
+	if goargs.HasArgs(argsArr, "--version") {
+		fmt.Println("v0.0.1")
 	}
 
 	// 绑定变量
@@ -49,8 +54,6 @@ func Test(t *testing.T) {
 	args.StringsOperan("DEST", &DEST, nil)
 	args.BoolOption("-c", &c, false)
 	args.IntOption("-b", &b, 1024)
-	args.BoolOption("--help", &help, false)
-	args.BoolOption("--version", &version, false)
 
 	// 处理参数
 	if err := args.Parse(argsArr, goargs.AllowUnknowOption); err != nil {
@@ -60,19 +63,11 @@ func Test(t *testing.T) {
 	}
 
 	//  输出
-
 	fmt.Println("--------------------------------------------------")
 	fmt.Printf("%12s  %v \n", "SRC", SRC)
 	fmt.Printf("%12s  %v \n", "DEST", DEST)
 	fmt.Printf("%12s  %v \n", "-c", c)
 	fmt.Printf("%12s  %v \n", "-b", b)
-	fmt.Printf("%12s  %v \n", "--help", help)
-	fmt.Printf("%12s  %v \n", "--vesrion", version)
 	fmt.Println("--------------------------------------------------")
-
-	if version {
-		fmt.Println("v0.0.1")
-		return
-	}
 
 }
