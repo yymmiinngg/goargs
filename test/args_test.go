@@ -38,27 +38,28 @@ func Test(t *testing.T) {
 		fmt.Println(err.Error())
 		return
 	}
-
-	// 显示帮助
-	if goargs.HasArgs(argsArr, "-H", "--help") {
-		fmt.Println("--------------------------------------------------")
-		fmt.Println(args.Usage())
-	}
-
-	// 显示版本
-	if goargs.HasArgs(argsArr, "--version") {
-		fmt.Println("--------------------------------------------------")
-		fmt.Println("v0.0.1")
-	}
-
 	// 绑定变量
 	args.StringOperan("SRC", &SRC, "")
 	args.StringsOperan("DEST", &DEST, nil)
 	args.BoolOption("-c", &c, false)
 	args.IntOption("-b", &b, 1024)
-
 	// 处理参数
-	if err := args.Parse(argsArr, goargs.AllowUnknowOption); err != nil {
+	err = args.Parse(argsArr, goargs.AllowUnknowOption)
+
+	// 显示帮助
+	if args.HasItem("-H", "--help") {
+		fmt.Println("--------------------------------------------------")
+		fmt.Println(args.Usage())
+	}
+
+	// 显示版本
+	if args.HasItem("--version") {
+		fmt.Println("--------------------------------------------------")
+		fmt.Println("v0.0.1")
+	}
+
+	// 错误输出
+	if err != nil {
 		fmt.Println(err.Error())
 		fmt.Println(args.Usage())
 		return
