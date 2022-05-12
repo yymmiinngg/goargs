@@ -9,6 +9,7 @@ import (
 
 type GoArgs struct {
 	template         string            // 模板
+	args             []string          // 参数源
 	command          string            // 命令
 	operans          []string          // 参数名称
 	operans_value    []string          // 参数值
@@ -153,6 +154,17 @@ func Compile(template string) (*GoArgs, error) {
 func (goargs *GoArgs) Usage() string {
 	lines := strings.Split(strings.TrimSpace(goargs.template), "\n")
 	text := ""
+
+	cmd := goargs.command
+	cmd1 := getRightOuter(goargs.command, "\\")
+	cmd2 := getRightOuter(goargs.command, "/")
+	if len(cmd1) != 0 {
+		cmd = cmd1
+	}
+	if len(cmd2) != 0 && len(cmd2) < len(cmd) {
+		cmd = cmd2
+	}
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -172,15 +184,6 @@ func (goargs *GoArgs) Usage() string {
 			line = " " + line[1:]
 		}
 
-		cmd := goargs.command
-		cmd1 := getRightOuter(goargs.command, "\\")
-		cmd2 := getRightOuter(goargs.command, "/")
-		if len(cmd1) != 0 {
-			cmd = cmd1
-		}
-		if len(cmd2) != 0 && len(cmd2) < len(cmd) {
-			cmd = cmd2
-		}
 		line = strings.ReplaceAll(line, "{{COMMAND}}", cmd)
 		line = strings.ReplaceAll(line, "{{OPTION}}", "[OPTION]...")
 		text += line + "\n"
@@ -191,6 +194,7 @@ func (goargs *GoArgs) Usage() string {
 // 处理参数
 func (goargs *GoArgs) Parse(args []string, parseOptions ...ParseOption) error {
 	goargs.parseOptions = append(goargs.parseOptions, parseOptions...)
+	goargs.args = args
 	li := -1
 	for true {
 		li++
@@ -331,9 +335,9 @@ func (goargs *GoArgs) Parse(args []string, parseOptions ...ParseOption) error {
 }
 
 // 是否存在参数项
-func HasArgs(args []string, options ...string) bool {
+func (it *GoArgs) HasItem(options ...string) bool {
 	for _, h := range options {
-		if findOut(args, h) != -1 {
+		if findOut(it.args, h) != -1 {
 			return true
 		}
 	}
